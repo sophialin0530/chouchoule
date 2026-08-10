@@ -6,7 +6,11 @@
 window.GACHA_CONFIG = {
   siteName: "示例花园",
   subtitle: "在紫色小宇宙，遇见下一张卡",
-  // 主题色：默认白底金边；可换成用户品牌色（如示例花园紫调）
+  // 照片方向：portrait（竖屏 2:3）/ landscape（横屏 3:2）/ mixed（混合强制竖屏）
+  orientation: "portrait",
+  // 命名风格：四字可爱 / 四字诗意 / 二字萌系 / 用户自定义
+  namingStyle: "四字可爱",
+  // 主题色：默认白底金边；可换成用户品牌色
   theme: {
     bg: "#f8f0fb",        // 页面背景
     surface: "#ffffff",   // 卡片/面板底色
