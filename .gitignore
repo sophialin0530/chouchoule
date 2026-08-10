@@ -1,0 +1,14 @@
+# 依赖与构建产物
+node_modules/
+dist/
+build/
+__pycache__/
+*.pyc
+
+# 系统文件
+.DS_Store
+Thumbs.db
+*.log
+
+# 本地私人项目笔记，不发布到公开仓库（文件仍保留在本地 skill 中）
+references/chat_learnings.md
