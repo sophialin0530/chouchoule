@@ -135,6 +135,25 @@ python scripts/build_site.py --config config.json --orientation <portrait|landsc
 - 部署失败或链接打不开：等几秒重试；仍不行就回退为「把 dist/ 打包成 zip 给用户自己传」。
 - 卡名若用户始终不确认，先用占位名（如「未命名 01」）生成，后续可改 `config.js` 重跑 Step C/D。
 
+---
+
+## 快速使用（适配哪些 AI 助手）
+
+本 skill 的入口是 `SKILL.md`，任何能读取并遵循 skill 的 AI 助手都能驱动它。常见用法：
+
+| AI 助手 | 怎么用 |
+|---|---|
+| **WorkBuddy** | 新开对话直接说「把我的照片做成抽抽乐网站」，自动加载本 skill |
+| **GPT（ChatGPT）** | 上传本 skill 目录或粘贴 SKILL.md，说「按这个 skill 帮我把照片做成抽抽乐」 |
+| **Claude** | 上传 skill 目录，说「follow SKILL.md 帮我搭建」 |
+| **Codex / Cursor** | 把 skill 目录加入项目，让其按 SKILL.md 执行 build_site.py |
+| **豆包**（字节） | 上传 SKILL.md + 照片目录，要求按三段式流程做 |
+| **Kimi**（月之暗面） | 同上 |
+| **通义千问**（阿里） | 同上 |
+| **文心一言**（百度） | 同上 |
+
+核心：无论用哪个助手，都先走 Phase 1 需求单 → Phase 2 工作流 → Phase 3 搭建部署，不要跳过需求单直接收图。
+
 ## 文件地图
 - `assets/template/`：数据驱动的抽卡站模板（index.html / styles.css / app.js / favicon.svg / config.example.js），app.js 读 `window.GACHA_CONFIG`，翻卡用「切换 src」不依赖背面 3D 叠层
 - `scripts/build_site.py`：config + 照片 → 可部署 `dist/`，内置质量门禁与卡背总览图
