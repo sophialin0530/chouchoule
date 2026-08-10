@@ -19,7 +19,7 @@ disable: false
 这些是从做抽卡网站的实战聊天记录 + GPT 复盘里挑出来、经实战验证的做法。本 skill 默认就这么做，不要等用户再说一遍；详细工程规则见 `references/engineering_rules.md`。
 
 ### A. 来自用户原始诉求（卡名 / 兑换码 / 命名规范）
-1. **卡名从卡背来取。** 每张卡名必须看**卡背（背面）图像**联想生成（默认四个汉字、贴合画面气质、去重、不自动加编号）。逐张/批量给用户确认，支持 `旧名→新名` 覆盖表。详见 `references/naming-rules.md`，这是本 skill 的差异化能力。
+1. **卡名默认从卡面（照片）来取。** 更可控、不依赖卡背是否已定制；只有当用户选择「逐张定制卡背」时，才允许用卡背主题润色名字。默认**四个汉字、贴合画面气质、去重、不自动加编号**，逐张/批量给用户确认，支持 `旧名→新名` 覆盖表。详见 `references/naming-rules.md`。
 2. **自动生成「10 个普通兑换码 + 1 个万分码」。** 普通码默认 500 积分；万分码一次到账 10000。码名贴合主题（如 `WANFEN10000`）。同一浏览器只能兑换一次。由 build 脚本自动产出。
 3. **图片命名规范固定。** 卡面 `cardNN.webp`、卡背 `backNN.webp`、缩略图 `cardNN_t.webp / backNN_t.webp`。源图转 WebP 并修 EXIF 方向（实战踩过的坑：手机横拍图翻面会横过来），抽卡时预加载大图防白屏。
 
@@ -42,17 +42,27 @@ disable: false
 
 ## Phase 1 · 提取需求（extract）
 
-**先钉需求，不急着写代码。** 用提问或读图把下面几项确认清楚（没给的用方括号默认值，但要点一下让用户知道）：
+**先钉需求，不急着收照片。** 用户说「想做抽抽乐」或类似需求时，**必须先发需求单并拿到确认**；若用户/上游 agent 直接甩图，先回需求单，不进入收图。这是硬性闸门，不能跳过。
 
-- **网站名字** + 副标题/slogan（如「示例花园 · 在紫色小宇宙，遇见下一张卡」）
-- **卡牌数量** = 照片组数（示例站是 49 张）
-- **稀有度分几类、每类名字与概率**（强烈建议给 `references/tiers_blueprint.md` 让用户选或改）
-- **初始积分 / 单抽消耗 / 十连消耗**（默认 300 / 10 / 90）
-- **主题色**：默认**白底金边**；若用户有自己的品牌色（如示例花园紫调），按品牌色走，并在 SKILL 注释标明
-- **照片怎么给**：卡面（正面）+ 卡背（背面）两套图。规范命名 `cardNN.ext` / `backNN.ext`；若不规整，先用脚本统一（`scripts/build_site.py` 会按序号配对重命名）
-- **兑换码**：默认自动生成「10 普通码(500) + 1 万分码(10000)」；用户也可指定码名或价值
+需求单用下面这份轻量模板，带默认选项，用户可直接选或自己输入：
 
-把确认结果写成一份 `config.json`（结构见 `assets/template/config.example.js` 的注释），作为 Phase 3 的输入。
+| 序号 | 项目 | 通俗问法 | 默认选项 |
+|---|---|---|---|
+| 1 | 网站标题/主题 | 网站想叫什么名字、和什么主题相关？ | 用户输入 |
+| 2 | 照片方向 | 照片以什么方向为主？建议上传统一方向照片，系统会统一裁切。 | **竖屏 2:3（约 57×87mm）** / 横屏 3:2（约 87×57mm） / 混合（统一裁到竖屏，可能切边） |
+| 3 | 网站风格 | 想要什么整体风格？ | 白底金边 / 浪漫紫调 / 清新绿 / 暗黑系 / 用户输入 |
+| 4 | 卡背处理 | 卡背怎么设计？ | **统一卡背**（传 1 张/选 1 个主题，全卡共用） / 分组卡背（按稀有度 R/SR/SSR/隐藏款各 1 套） / 逐张定制卡背（给每张卡面配对应背） |
+| 5 | 等级分级 | 稀有度分几档、各档概率？ | R / SR / SSR / 隐藏款（72/20/6.5/1.5，50 抽保底 SSR+） / 用户自定义 |
+| 6 | 命名风格 | 卡名想要什么风格？ | **四字可爱** / 四字诗意 / 二字萌系 / 用户输入 |
+| 7 | 隐藏款/彩蛋 | 要不要隐藏款或彩蛋卡？触发方式？ | 不要 / 要，50 抽保底 SSR+ 里有概率出隐藏款 / 要，用户指定触发条件 |
+| 8 | 交付形式 | 你打算怎么用？ | **能发给别人试玩的链接** / 本地试玩 / 交接压缩包给别人接着做 |
+
+> 说明：
+> - 选项里没想要的可以直接打字告诉我，比如「命名风格要古风四字」。
+> - 若选「能发给别人试玩的链接」，默认照片同意通过临时链接分享；若用户追问再解释「链接是临时的、会被看到」即可。
+> - 第 1–8 项确认完，才能进入 Phase 2。
+
+把确认结果写成一份 `config.json`（结构见 `assets/template/config.example.js`），作为 Phase 3 的输入。
 
 ---
 
@@ -68,31 +78,54 @@ disable: false
 
 ## Phase 3 · 搭建并部署（build + deploy）——【最终步，确认闸之后才跑】
 
-### Step A · 整理图片
-把用户照片按 `cardNN` / `backNN` 配对；调 `scripts/build_site.py` 统一转 WebP + 缩略图 + 修方向。
+### Step A · 整理图片 + 生成裁剪预览
+把用户照片按 `cardNN` / `backNN` 配对；按 Phase 1 确认的方向（竖屏 2:3 / 横屏 3:2 / 混合强制竖屏）统一 center-crop；调 `scripts/build_site.py` 转 WebP + 缩略图 + 修 EXIF 方向 + 生成 `crop_preview.png`（裁切后卡面总览）。
 
-### Step B · 卡背取卡名（对应强提醒 #1 / 命名规则）
-先用脚本生成的 `cardback_contact_sheet.png` 或逐张 Read 看 `backNN` 图像，**为每张卡联想一个默认四字诗意名**（贴合画面、去重、不附加编号），列出给用户确认/微调；支持 `旧名→新名` 覆盖表写进 `config.json` 的 `override`。规则详见 `references/naming-rules.md`。确认后写进 `config.json` 的 `names[]`。
+> 若某张照片方向与目标比例差太远，脚本会打印「⚠️ 可能切头/切脸」告警。务必把 `crop_preview.png` 给用户看一眼，确认没问题再继续。
 
-### Step C · 生成站点（自动跑质量门禁）
+### Step B · 卡背设计问答（强制子步骤）
+根据 Phase 1 的「卡背处理」选项，**必须产出一份 `backPlan` 并整理出对应卡背文件**，才能进入下一步：
+
+| 卡背处理选项 | 操作流程 |
+|---|---|
+| **统一卡背** | 用户传 1 张背图或选 1 个主题 → 复制成 `back01` ~ `backNN`，全卡共用 |
+| **分组卡背** | 按 R/SR/SSR/隐藏款各准备 1 张背图 → 按每张卡的稀有度复制到对应 `backNN` |
+| **逐张定制** | 用户给每张卡面的背参考图/文字描述 → 一一对应生成 `back01` ~ `backNN`；生成「卡背总览图」让用户核对是否对得上 |
+
+这一步没跑完，不能进命名/构建。这是为了补上「卡背定制」缺失的环节。
+
+### Step C · 命名（默认从卡面，档 3 可从背润色）
+用脚本生成的卡面总览图（或 `crop_preview.png`）逐张看卡面，**为每张卡想一个默认四字名**（贴合画面、去重、不附加编号）。只有当 Step B 选了「逐张定制卡背」且背图有明显主题时，才允许用卡背主题润色。
+
+列出名字给用户确认，**每次都要附重命名示例**：
+> 这些名字都能改。直接发「把【旧名】改名成【新名】」就行，例如「把樱花物语改名成樱桃物语」，我马上改并重跑。
+
+支持 `旧名→新名` 覆盖表写进 `config.json` 的 `override`。规则详见 `references/naming-rules.md`。确认后写进 `config.json` 的 `names[]`。
+
+### Step D · 生成站点（自动跑质量门禁）
 运行：
 ```bash
-python scripts/build_site.py --config config.json --cards-dir <照片目录> --out dist
-# 或卡面/卡背分目录：
-python scripts/build_site.py --config config.json --faces-dir <卡面目录> --backs-dir <卡背目录> --out dist
+python scripts/build_site.py --config config.json --orientation <portrait|landscape|mixed> --faces-dir <卡面目录> --backs-dir <卡背目录> --out dist
 ```
-脚本会产出 `dist/`（填好数据的 `config.js` + 模板三件套 + `assets/cards/` + 卡背总览图），并自动校验：卡面/卡背数量与配对、卡名去重、稀有度是否在设定档位内、兑换码数量（见强提醒 #2）。若 `config.json` 没写 vouchers，脚本自动生成「10 普通码 + 1 万分码」。
+脚本会产出 `dist/`（填好数据的 `config.js` + 模板三件套 + `assets/cards/` + `crop_preview.png` + 卡背总览图），并自动校验：卡面/卡背数量与配对、卡名去重、稀有度档位、兑换码数量（见强提醒 #2）。若 `config.json` 没写 vouchers，脚本自动生成「10 普通码 + 1 万分码」。
 
-### Step D · 部署成线上链接
-用 `workbuddy_cloudstudio_deploy` 工具，目录指向 `dist/`：
-```json
-{ "directory": "<dist 绝对路径>" }
-```
-返回 `shareLink` 即为**分享链接**。
+### Step E · 部署 + 交付检查清单（防漏最后一步）
+根据 Phase 1「交付形式」决定输出：
 
-### Step E · 交付 + 临时提示（对应强提醒 #7）
-向用户给出分享链接，并明确说明：
-> 这是云端沙箱的**临时网页**，可能随时失效。需要稳定长期链接时，**新开一个对话框**，把 `references/migration_prompt.md` 里的 prompt 连同本链接/目录路径一起发过去即可迁移。
+- **能发给别人试玩的链接**：用 `workbuddy_cloudstudio_deploy` 部署 `dist/`，拿到 `shareLink`。
+- **本地试玩**：直接给用户 `dist/` 目录，并说明如何在浏览器打开 `index.html`。
+- **交接压缩包**：把 `dist/` 打包成 zip，不含缓存/临时文件。
+
+**交付检查清单（必须逐条确认，未完成不收工）**：
+- [ ] 网站标题/主题已按需求单实现
+- [ ] 照片方向/尺寸已按选项裁切并给用户看过 `crop_preview.png`
+- [ ] 卡背处理已按选项实现（统一/分组/逐张）
+- [ ] 卡名已确认（含重命名示例已给出）
+- [ ] 稀有度/保底/兑换码已按需求单实现
+- [ ] 交付形式已兑现：链接/本地/压缩包
+- [ ] 已提示「临时链接可能失效」并附迁移 prompt（`references/migration_prompt.md`）
+
+全部打勾后，才算完成。
 
 ---
 
@@ -106,7 +139,7 @@ python scripts/build_site.py --config config.json --faces-dir <卡面目录> --b
 - `assets/template/`：数据驱动的抽卡站模板（index.html / styles.css / app.js / favicon.svg / config.example.js），app.js 读 `window.GACHA_CONFIG`，翻卡用「切换 src」不依赖背面 3D 叠层
 - `scripts/build_site.py`：config + 照片 → 可部署 `dist/`，内置质量门禁与卡背总览图
 - `references/engineering_rules.md`：工程质量门槛全集（状态分离、唯一存档、十连新/旧卡、灰卡背、翻卡、兑换码边界、质量门禁、可配置项表）
-- `references/naming-rules.md`：卡名从卡背逐张联想的规则（四字默认、去重、覆盖表、不编号）
+- `references/naming-rules.md`：卡名默认从卡面取、逐张背定制时从背润色的规则（四字默认、去重、覆盖表、重命名示例）
 - `references/tiers_blueprint.md`：稀有度分级示例与概率设计参考
 - `references/migration_prompt.md`：临时链接迁移到稳定链接的 prompt 模板
 - `references/deployment-handoff.md`：本地版 + 干净交接压缩包 + 中国大陆连通性提醒
