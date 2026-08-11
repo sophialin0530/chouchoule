@@ -20,7 +20,7 @@ disable: false
 
 ### A. 来自用户原始诉求（卡名 / 兑换码 / 命名规范）
 1. **卡名默认从卡面（照片）来取。** 更可控、不依赖卡背是否已定制；只有当用户选择「逐张定制卡背」时，才允许用卡背主题润色名字。默认**四个汉字、贴合画面气质、去重、不自动加编号**，逐张/批量给用户确认，支持 `旧名→新名` 覆盖表。详见 `references/naming-rules.md`。
-2. **自动生成「10 个普通兑换码 + 1 个万分码」。** 普通码默认 500 积分；万分码一次到账 10000。码名贴合主题（如 `WANFEN10000`）。同一浏览器只能兑换一次。由 build 脚本自动产出。
+2. **自动生成「10 个普通兑换码 + 1 个万分码」，交付时必须连同链接/压缩包一起给用户。** 普通码默认 500 积分；万分码一次到账 10000。**码名默认为英文+数字组合**（从网站名提取英文/拼音前缀，如网站叫「一二布布」则码为 `YIER01`~`YIER10`+`YIERWANFEN`；也可通过 `--voucher-prefix` 自定义前缀）。同一浏览器只能兑换一次。构建脚本会自动产出 `dist/codes.txt` 清单。**必须提示用户：可自行修改 config.js 的 vouchers 字段来增删/改兑换码和积分。**
 3. **图片命名规范固定。** 卡面 `cardNN.webp`、卡背 `backNN.webp`、缩略图 `cardNN_t.webp / backNN_t.webp`。源图转 WebP 并修 EXIF 方向（实战踩过的坑：手机横拍图翻面会横过来），抽卡时预加载大图防白屏。
 
 ### B. 来自工程复盘（质量门槛，避免经典坑）
@@ -107,7 +107,7 @@ disable: false
 ```bash
 python scripts/build_site.py --config config.json --orientation <portrait|landscape|mixed> --faces-dir <卡面目录> --backs-dir <卡背目录> --out dist
 ```
-脚本会产出 `dist/`（填好数据的 `config.js` + 模板三件套 + `assets/cards/` + `crop_preview.png` + 卡背总览图），并自动校验：卡面/卡背数量与配对、卡名去重、稀有度档位、兑换码数量（见强提醒 #2）。若 `config.json` 没写 vouchers，脚本自动生成「10 普通码 + 1 万分码」。
+脚本会产出 `dist/`（填好数据的 `config.js` + 模板三件套 + `assets/cards/` + `crop_preview.png` + 卡背总览图 + `codes.txt` 兑换码清单），并自动校验：卡面/卡背数量与配对、卡名去重、稀有度档位、兑换码数量（见强提醒 #2）。若 `config.json` 没写 vouchers，脚本自动生成「10 普通码 + 1 万分码」（英文+数字组合，前缀从网站名提取或通过 `--voucher-prefix` 指定）。
 
 ### Step E · 部署 + 交付检查清单（防漏最后一步）
 根据 Phase 1「交付形式」决定输出：
@@ -122,6 +122,8 @@ python scripts/build_site.py --config config.json --orientation <portrait|landsc
 - [ ] 卡背处理已按选项实现（统一/分组/逐张）
 - [ ] 卡名已确认（含重命名示例已给出）
 - [ ] 稀有度/保底/兑换码已按需求单实现
+- [ ] **兑换码清单已连同链接/压缩包一起交付**（`dist/codes.txt` 或手动列出 10 普通码 + 1 万分码；码为英文+数字组合，默认从网站名提取前缀）
+- [ ] **已提示用户可自行修改 config.js 的 vouchers 字段来增删/改兑换码和积分**
 - [ ] 交付形式已兑现：链接/本地/压缩包
 - [ ] 已提示「临时链接可能失效」并附迁移 prompt（`references/migration_prompt.md`）
 
