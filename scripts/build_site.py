@@ -120,7 +120,9 @@ def make_vouchers(site_name, custom_prefix=None):
         if len(english_part) >= 2:
             base = english_part.upper()[:8]  # 截断到 8 字符
         else:
-            base = (slug(site_name).upper() or "GACHA")[:8]
+            # 纯中文/无英文：强制 ASCII（中文不入码名，符合"英文+数字组合"要求）
+            ascii_part = re.sub(r"[^A-Za-z0-9]", "", site_name or "")
+            base = (ascii_part.upper() or "GACHA")[:8]
     vs = [{"code": "%s%02d" % (base, i + 1), "points": 500} for i in range(10)]
     vs.append({"code": "%sWANFEN" % base, "points": 10000})  # 万分码
     return vs
@@ -253,6 +255,12 @@ def main():
         {"key": "R", "name": "R", "prob": 72, "color": "#b0a8c0"},
     ]
     vouchers = cfg.get("vouchers") or make_vouchers(cfg.get("siteName", "GACHA"), args.voucher_prefix)
+    # 纯中文站名兜底提示：码名是 GACHA 通用前缀时，提示用拼音/英文前缀更贴合主题
+    if not cfg.get("vouchers") and not args.voucher_prefix and vouchers:
+        if vouchers[0]["code"].startswith("GACHA"):
+            print("💡 站名「%s」无英文部分，兑换码用通用前缀 GACHA；"
+                  "如需贴合主题，可加 --voucher-prefix 指定拼音/英文前缀"
+                  "（如 --voucher-prefix ZIWU）" % cfg.get("siteName", ""))
 
     config_obj = {
         "siteName": cfg.get("siteName", "抽抽乐"),
