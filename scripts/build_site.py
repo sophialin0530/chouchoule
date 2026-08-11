@@ -103,11 +103,53 @@ def process_image(src, dst_webp, dst_thumb, aspect=2 / 3, orientation="portrait"
     return src.suffix.lstrip("."), False
 
 
-def make_vouchers(site_name):
-    base = (slug(site_name).upper() or "GACHA")
+def make_vouchers(site_name, custom_prefix=None):
+    """生成 10 个普通兑换码（各 500 积分）+ 1 个万分码（10000 积分）。
+
+    码名规则（默认英文+数字组合）：
+      - 若传入 custom_prefix，直接用之（如 "LOVE" → LOVE01~LOVE10 + LOVEWANFEN）
+      - 否则从 site_name 提取英文/拼音前缀：先尝试取纯字母部分，再 fallback 到 slug 大写
+      - 万分码固定后缀 WANFEN
+    """
+    if custom_prefix:
+        base = custom_prefix.upper().strip()
+    else:
+        # 尝试从 site_name 中提取已有的英文单词或拼音
+        import re
+        english_part = re.sub(r"[^a-zA-Z]", "", site_name or "")
+        if len(english_part) >= 2:
+            base = english_part.upper()[:8]  # 截断到 8 字符
+        else:
+            base = (slug(site_name).upper() or "GACHA")[:8]
     vs = [{"code": "%s%02d" % (base, i + 1), "points": 500} for i in range(10)]
     vs.append({"code": "%sWANFEN" % base, "points": 10000})  # 万分码
     return vs
+
+
+def write_codes_file(vouchers, out_dir):
+    """生成 codes.txt 兑换码清单，方便交付时连同链接一起发给用户"""
+    path = Path(out_dir) / "codes.txt"
+    lines = ["=" * 50, "抽抽乐兑换码清单", "=" * 50, ""]
+    normal = [v for v in vouchers if v.get("points", 0) < 1000]
+    special = [v for v in vouchers if v.get("points", 0) >= 1000]
+    if normal:
+        lines.append("普通兑换码（每个 500 积分）：")
+        for v in normal:
+            lines.append("  %s" % v["code"])
+        lines.append("")
+    if special:
+        lines.append("特殊兑换码：")
+        for v in special:
+            lines.append("  %s（%d 积分）" % (v["code"], v["points"]))
+        lines.append("")
+    lines.extend([
+        "-" * 50,
+        "使用方式：打开网站 → 右侧「兑换积分」→ 输入上方任一码 → 点击兑换",
+        "提示：每个码在同一浏览器只能用一次；你可以自行修改 config.js 里的 vouchers 来增删/改码。",
+        "-" * 50,
+    ])
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
 
 
 def contact_sheet(items, out_path, cell_w=220, cell_h=300):
@@ -139,6 +181,7 @@ def main():
     ap.add_argument("--backs-dir", help="卡背目录")
     ap.add_argument("--orientation", choices=["portrait", "landscape", "mixed"], help="照片方向：竖屏 2:3 / 横屏 3:2 / 混合强制竖屏（默认从 config 取，否则 portrait）")
     ap.add_argument("--out", default="dist", help="输出目录（默认 dist）")
+    ap.add_argument("--voucher-prefix", help="兑换码英文前缀（如 LOVE → LOVE01~LOVE10+LOVEWANFEN）；不传则自动从网站名提取")
     args = ap.parse_args()
 
     cfg = {}
@@ -209,7 +252,7 @@ def main():
         {"key": "SR", "name": "SR", "prob": 20, "color": "#9b8cff"},
         {"key": "R", "name": "R", "prob": 72, "color": "#b0a8c0"},
     ]
-    vouchers = cfg.get("vouchers") or make_vouchers(cfg.get("siteName", "GACHA"))
+    vouchers = cfg.get("vouchers") or make_vouchers(cfg.get("siteName", "GACHA"), args.voucher_prefix)
 
     config_obj = {
         "siteName": cfg.get("siteName", "抽抽乐"),
@@ -244,7 +287,7 @@ def main():
     if cs:
         print("卡背总览已生成：", cs)
 
-    # 质量门禁 audit
+    # 质量门禁 audit + 兑换码清单
     print("=== 构建校验 ===")
     print("照片方向:", orientation, "(目标比例 %.2f)" % aspect)
     print("卡牌数量:", len(cards))
@@ -257,7 +300,21 @@ def main():
     known = {t["key"] for t in tiers}
     bad = {c["tier"] for c in cards if c["tier"] not in known}
     print("稀有度档位:", "PASS" if not bad else "[注意] 出现未定义档位 %s" % bad)
-    print("兑换码: %d 普通 + 1 万分（万分码=%s）" % (max(0, len(vouchers) - 1), vouchers[-1]["code"] if vouchers else "-"))
+
+    # 输出兑换码清单（交付必需品）
+    normal_codes = [v["code"] for v in vouchers if v.get("points", 0) < 1000]
+    special_codes = [v["code"] for v in vouchers if v.get("points", 0) >= 1000]
+    print("兑换码: %d 普通 + %d 万分" % (len(normal_codes), len(special_codes)))
+    if normal_codes:
+        print("  普通码: " + ", ".join(normal_codes))
+    if special_codes:
+        print("  万分码: " + ", ".join(special_codes))
+
+    # 写 codes.txt 到输出目录
+    codes_file = write_codes_file(vouchers, out)
+    if codes_file:
+        print("兑换码清单已生成: %s" % codes_file.resolve())
+
     print("输出目录:", out.resolve())
     print("[OK] 构建完成。用 workbuddy_cloudstudio_deploy 部署该目录即可得到分享链接。")
 
